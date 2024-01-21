@@ -70,19 +70,21 @@ class MainCommand extends TheMcCommand.HasSub {
                 final long cur = System.currentTimeMillis();
 
                 final long begin;
+                final long end;
 
                 final long ONE_DAY = 24 * 60 * 60 * 1000L;
 
                 if (this.isToday) {
                     begin = plugin.getTodayBeginTime(cur);
+                    end = begin + ONE_DAY;
                 } else {
-                    begin = plugin.getTodayBeginTime(cur) + ONE_DAY;
+                    end = plugin.getTodayBeginTime(cur);
+                    begin = end - ONE_DAY;
                 }
-
 
                 final List<SignInInfo> list;
                 try {
-                    list = service.queryAllTimeBetween(begin, begin + ONE_DAY);
+                    list = service.queryAllTimeBetween(begin, end);
                 } catch (SQLException e) {
                     plugin.getSLF4JLogger().error("", e);
                     plugin.sendException(commandSender, e);
