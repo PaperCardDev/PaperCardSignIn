@@ -112,53 +112,67 @@ public class ThePlugin extends JavaPlugin implements Listener {
     }
 
 
-    private void onPlayerSignIn(@NotNull Player player) {
-        taskScheduler.runTaskAsynchronously(() -> {
-            final PlayerCoinsApi api = this.playerCoinsApi;
-            final int c = getHarvestCoins();
+    private void onPlayerSignIn(@NotNull Player player, @NotNull SignInServiceImpl service, long todayBegin) {
 
-            String coins;
-            if (api != null) {
-                try {
-                    api.addCoins(player.getUniqueId(), c);
-                    coins = "%d".formatted(c);
-                } catch (Exception e) {
-                    getSLF4JLogger().error("", e);
-                    coins = "ERROR";
-                }
-            } else {
-                coins = "NULL";
+        final PlayerCoinsApi api = this.playerCoinsApi;
+        final int c = getHarvestCoins();
+
+        String coins;
+        if (api != null) {
+            try {
+                api.addCoins(player.getUniqueId(), c);
+                coins = "%d".formatted(c);
+            } catch (Exception e) {
+                getSLF4JLogger().error("", e);
+                coins = "ERROR";
             }
+        } else {
+            coins = "NULL";
+        }
 
-            final String finalCoins = coins;
+        // 查询序号
+        String no;
+        try {
+            final Integer n = service.queryNo(player.getUniqueId(), todayBegin);
+            if (n != null)
+                no = "%d".formatted(n);
+            else no = "NULL";
+        } catch (SQLException e) {
+            this.getSLF4JLogger().error("", e);
+            no = "ERROR";
+        }
 
-            taskScheduler.runTask(player, () -> {
+        final String finalCoins = coins;
+        final String finalNo = no;
 
-                final TextComponent.Builder text = Component.text();
-                appendPrefix(text);
+        taskScheduler.runTask(player, () -> {
 
+            final TextComponent.Builder text = Component.text();
+            appendPrefix(text);
 
-                final TextComponent build = text.appendSpace()
-                        .append(player.displayName())
-                        .append(Component.text(" 完成了今日签到，并获得 ").color(NamedTextColor.GREEN))
-                        .append(Component.text(finalCoins).color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD))
-                        .append(Component.text(" 枚硬币~").color(NamedTextColor.GREEN))
-                        .build();
+            final TextComponent build = text.appendSpace()
+                    .append(player.displayName())
+                    .append(Component.text(" 完成了今日签到，并获得 "))
+                    .append(Component.text(finalCoins).color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD))
+                    .append(Component.text(" 枚硬币，"))
+                    .append(Component.text("这是今天第 "))
+                    .append(Component.text(finalNo).color(NamedTextColor.YELLOW))
+                    .append(Component.text(" 个签到的玩家~"))
+                    .build().color(NamedTextColor.GREEN);
 
-                getServer().broadcast(build);
+            getServer().broadcast(build);
 
-                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
-            });
-
+            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
         });
     }
 
     private void checkAllSignIn() {
-        final SignInService service = this.signInService;
+        final SignInServiceImpl service = this.signInService;
 
         assert service != null;
 
         final long current = System.currentTimeMillis();
+        final long todayBegin = this.getTodayBeginTime(current);
 
         synchronized (this.signInBeginTime) {
 
@@ -171,20 +185,24 @@ public class ThePlugin extends JavaPlugin implements Listener {
                 // 时长不足
                 if (current - begin < this.getNeedOnlineTime()) continue;
 
-                try {
-                    service.addSignIn(new SignInInfo(uuid, current));
-                } catch (Exception e) {
-                    getSLF4JLogger().error("", e);
-                    continue;
-                }
+                taskScheduler.runTaskAsynchronously(() -> {
+                    // 添加签到记录
+                    try {
+                        service.addSignIn(new SignInInfo(uuid, current));
+                    } catch (Exception e) {
+                        getSLF4JLogger().error("", e);
+                        return;
+                    }
+
+                    // 完成签到，做一些动作
+                    final Player player = getServer().getPlayer(uuid);
+                    if (player != null) this.onPlayerSignIn(player, service, todayBegin);
+                });
+
 
                 // 在这里移除, 在下一次循环会抛出异常
                 // this.signInBeginTime.remove(uuid);
                 removes.add(uuid);
-
-                // 完成签到，做一些动作
-                final Player player = getServer().getPlayer(uuid);
-                if (player != null) this.onPlayerSignIn(player);
             }
 
             final int size = removes.size();

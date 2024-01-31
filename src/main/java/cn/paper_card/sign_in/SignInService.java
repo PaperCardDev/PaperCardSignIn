@@ -12,5 +12,7 @@ interface SignInService {
 
     @Nullable SignInInfo queryOneTimeAfter(@NotNull UUID playerId, long time) throws Exception;
 
+    @Nullable Integer queryNo(@NotNull UUID playerId, long todayBegin) throws Exception;
+
     @NotNull List<SignInInfo> queryAllTimeBetween(long begin, long end) throws Exception;
 }

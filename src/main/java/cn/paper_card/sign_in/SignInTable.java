@@ -22,6 +22,8 @@ class SignInTable extends Parser<SignInInfo> {
 
     private PreparedStatement statementQueryPlayerTimeAfter = null;
 
+    private PreparedStatement statementQueryNoToday = null;
+
     private final @NotNull Connection connection;
 
     SignInTable(@NotNull Connection connection) throws SQLException {
@@ -75,6 +77,19 @@ class SignInTable extends Parser<SignInInfo> {
         return this.statementQueryPlayerTimeAfter;
     }
 
+    private @NotNull PreparedStatement getStatementQueryNoToday() throws SQLException {
+        if (this.statementQueryNoToday == null) {
+            this.statementQueryNoToday = this.connection.prepareStatement("""
+                    SELECT no
+                    FROM (SELECT row_number() over (ORDER BY time) as no, uid1, uid2
+                          FROM %s
+                          WHERE time >= ?) p
+                    WHERE (p.uid1, p.uid2) = (?, ?)
+                    LIMIT 1;""".formatted(NAME));
+        }
+        return this.statementQueryNoToday;
+    }
+
     int insert(@NotNull UUID playerId, long time) throws SQLException {
         final PreparedStatement ps = this.getStatementInsert();
         ps.setLong(1, playerId.getMostSignificantBits());
@@ -107,5 +122,20 @@ class SignInTable extends Parser<SignInInfo> {
         ps.setLong(3, time);
         final ResultSet resultSet = ps.executeQuery();
         return this.parseOne(resultSet);
+    }
+
+    @Nullable Integer queryNo(@NotNull UUID uuid, long todayBegin) throws SQLException {
+        final PreparedStatement ps = this.getStatementQueryNoToday();
+        ps.setLong(1, todayBegin);
+        ps.setLong(2, uuid.getMostSignificantBits());
+        ps.setLong(3, uuid.getLeastSignificantBits());
+        final ResultSet resultSet = ps.executeQuery();
+
+        return new Parser<Integer>() {
+            @Override
+            public @NotNull Integer parseRow(@NotNull ResultSet resultSet) throws SQLException {
+                return resultSet.getInt(1);
+            }
+        }.parseOne(resultSet);
     }
 }

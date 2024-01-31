@@ -84,6 +84,27 @@ class SignInServiceImpl implements SignInService {
     }
 
     @Override
+    public @Nullable Integer queryNo(@NotNull UUID playerId, long todayBegin) throws SQLException {
+        synchronized (this.mySqlConnection) {
+            try {
+                final SignInTable t = this.getTable();
+
+                final Integer no = t.queryNo(playerId, todayBegin);
+                this.mySqlConnection.setLastUseTime();
+
+                return no;
+
+            } catch (SQLException e) {
+                try {
+                    this.mySqlConnection.handleException(e);
+                } catch (SQLException ignored) {
+                }
+                throw e;
+            }
+        }
+    }
+
+    @Override
     public @NotNull List<SignInInfo> queryAllTimeBetween(long begin, long end) throws SQLException {
         synchronized (this.mySqlConnection) {
             try {
