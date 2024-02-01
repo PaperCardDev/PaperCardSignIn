@@ -120,7 +120,7 @@ public class ThePlugin extends JavaPlugin implements Listener {
         String coins;
         if (api != null) {
             try {
-                api.addCoins(player.getUniqueId(), c);
+                api.addCoins(player.getUniqueId(), c, "玩家%s完成当日签到赠送".formatted(player.getName()));
                 coins = "%d".formatted(c);
             } catch (Exception e) {
                 getSLF4JLogger().error("", e);
