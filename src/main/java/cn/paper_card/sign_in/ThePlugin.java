@@ -71,7 +71,12 @@ public class ThePlugin extends JavaPlugin implements Listener {
 
         taskScheduler.runTaskTimerAsynchronously(this::checkAllSignIn, 20, 20);
 
-        this.playerCoinsApi = this.getServer().getServicesManager().load(PlayerCoinsApi.class);
+        try {
+            this.playerCoinsApi = this.getServer().getServicesManager().load(PlayerCoinsApi.class);
+        } catch (Exception e) {
+            this.getSLF4JLogger().error("", e);
+        }
+
         if (this.playerCoinsApi == null) {
             getSLF4JLogger().warn("未连接到PlayerCoinsApi");
         } else {
@@ -118,7 +123,7 @@ public class ThePlugin extends JavaPlugin implements Listener {
         final int c = getHarvestCoins();
 
         String coins;
-        if (api != null) {
+        if (api != null && c > 0) {
             try {
                 api.addCoins(player.getUniqueId(), c, "玩家%s完成当日签到赠送".formatted(player.getName()));
                 coins = "%d".formatted(c);
@@ -127,7 +132,7 @@ public class ThePlugin extends JavaPlugin implements Listener {
                 coins = "ERROR";
             }
         } else {
-            coins = "NULL";
+            coins = null;
         }
 
         // 查询序号
@@ -150,18 +155,23 @@ public class ThePlugin extends JavaPlugin implements Listener {
             final TextComponent.Builder text = Component.text();
             appendPrefix(text);
 
-            final TextComponent build = text.appendSpace()
-                    .append(player.displayName())
-                    .append(Component.text(" 完成了今日签到，并获得 "))
-                    .append(Component.text(finalCoins).color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD))
-                    .append(Component.text(" 枚硬币，"))
-                    .append(Component.text("这是今天第 "))
-                    .append(Component.text(finalNo).color(NamedTextColor.YELLOW))
-                    .append(Component.text(" 个签到的玩家~"))
-                    .build().color(NamedTextColor.GREEN);
+            text.appendSpace();
+            text.append(player.displayName());
+            text.append(Component.text(" 完成了今日签到"));
 
-            getServer().broadcast(build);
+            if (finalCoins != null) {
+                text.append(Component.text("，并获得"));
+                text.append(Component.text(finalCoins).color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
+                text.append(Component.text(" "));
+                text.append(Component.text(api.getCoinsName()));
+            }
 
+            text.append(Component.text("，这是今天第 "));
+            text.append(Component.text(finalNo).color(NamedTextColor.YELLOW));
+            text.append(Component.text(" 个签到的玩家~"));
+
+
+            getServer().broadcast(text.build().color(NamedTextColor.GREEN));
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
         });
     }
@@ -251,11 +261,12 @@ public class ThePlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onQuit(@NotNull PlayerQuitEvent event) {
         final Player player = event.getPlayer();
+        final Long begin;
         synchronized (this.signInBeginTime) {
-            final Long begin = this.signInBeginTime.remove(player.getUniqueId());
-            if (begin != null) {
-                getSLF4JLogger().info("玩家[%s]中断签到".formatted(player.getName()));
-            }
+            begin = this.signInBeginTime.remove(player.getUniqueId());
+        }
+        if (begin != null) {
+            getSLF4JLogger().info("玩家[%s]中断签到".formatted(player.getName()));
         }
     }
 
