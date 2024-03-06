@@ -162,7 +162,6 @@ public class ThePlugin extends JavaPlugin implements Listener {
             if (finalCoins != null) {
                 text.append(Component.text("，并获得"));
                 text.append(Component.text(finalCoins).color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
-                text.append(Component.text(" "));
                 text.append(Component.text(api.getCoinsName()));
             }
 
